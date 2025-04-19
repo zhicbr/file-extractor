@@ -1,0 +1,15 @@
+{
+  "name": "file-extractor",
+  "version": "1.0.0",
+  "description": "一个提取文件内容到Markdown的工具",
+  "main": "file-extractor.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "@electron/remote": "^2.0.11"
+  }
+}

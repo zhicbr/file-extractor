@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>文件提取工具</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .row {
+      display: flex;
+      margin-bottom: 20px;
+    }
+    .col {
+      flex: 1;
+      padding: 0 10px;
+    }
+    .file-explorer {
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      height: 400px;
+      overflow: auto;
+    }
+    
+
+    .file-explorer-header {
+      padding: 10px;
+      background-color: #f1f1f1;
+      border-bottom: 1px solid #ddd;
+      font-weight: bold;
+    }
+    .file-list {
+      list-style-type: none;
+      padding: 0;
+      margin: 0;
+    }
+    .file-item {
+      padding: 8px 10px;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+    }
+    .file-item:hover {
+      background-color: #f9f9f9;
+    }
+    .file-item.selected {
+      background-color: #e3f2fd;
+    }
+    .file-item-icon {
+      margin-right: 8px;
+      color: #666;
+    }
+    .folder-icon::before {
+      content: "📁";
+    }
+    .file-icon::before {
+      content: "📄";
+    }
+    .buttons {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    button {
+      padding: 10px 15px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+    .path-display {
+      padding: 10px;
+      background-color: #f1f1f1;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      margin-bottom: 15px;
+      white-space: nowrap;
+      overflow: auto;
+    }
+    .selected-items-container {
+      height: 400px;
+      display: flex;
+      flex-direction: column;
+    }
+    .selected-items-header {
+      font-weight: bold;
+      padding: 10px;
+      background-color: #f1f1f1;
+      border: 1px solid #ddd;
+      border-bottom: none;
+      border-radius: 4px 4px 0 0;
+    }
+    .selected-items {
+      flex-grow: 1; /* 自动填充剩余空间 */
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      padding: 10px;
+      border-radius: 0 0 4px 4px;
+    }
+    .selected-item {
+      padding: 5px;
+      background-color: #f1f1f1;
+      margin-bottom: 5px;
+      border-radius: 3px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .remove-btn {
+      background-color: #f44336;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      padding: 2px 5px;
+      font-size: 12px;
+    }
+    .status {
+      margin-top: 20px;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .success {
+      background-color: #dff0d8;
+      border: 1px solid #d6e9c6;
+      color: #3c763d;
+    }
+    .error {
+      background-color: #f2dede;
+      border: 1px solid #ebccd1;
+      color: #a94442;
+    }
+    .hidden {
+      display: none;
+    }
+    .breadcrumb {
+      padding: 8px 0;
+      margin-bottom: 10px;
+      list-style: none;
+      background-color: #f5f5f5;
+      border-radius: 4px;
+      display: flex;
+      flex-wrap: wrap;
+    }
+    .breadcrumb-item {
+      display: inline-block;
+      padding: 0 5px;
+      cursor: pointer;
+      color: #0275d8;
+    }
+    .breadcrumb-item:hover {
+      text-decoration: underline;
+    }
+    .breadcrumb-separator {
+      color: #666;
+    }
+    .back-btn {
+      background-color: #f1f1f1;
+      border: 1px solid #ddd;
+      color: #333;
+      padding: 5px 10px;
+      margin-right: 5px;
+      border-radius: 3px;
+    }
+    .back-btn:hover {
+      background-color: #e1e1e1;
+    }
+    
+    /* 上下文菜单样式 */
+    .context-menu {
+      background-color: white;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      min-width: 150px;
+    }
+    
+    .context-menu-item {
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+    
+    .context-menu-item:hover {
+      background-color: #f1f1f1;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>文件提取工具</h1>
+    
+    <div class="buttons">
+      <button id="selectBaseDirBtn">选择基础文件夹</button>
+      <button id="clearSelectionsBtn">清除所有选择</button>
+      <button id="generateMdBtn" disabled>生成MD文件</button>
+    </div>
+    
+    <div id="baseDirDisplay" class="path-display hidden">
+      当前基础文件夹: <span id="basePathText"></span>
+    </div>
+    
+    <div class="row">
+      <div class="col">
+        <div class="file-explorer">
+          <div class="file-explorer-header">文件浏览器</div>
+          <div class="breadcrumb" id="breadcrumb">
+            <button class="back-btn" id="backBtn" disabled>↑ 返回上级</button>
+            <div id="breadcrumbPath"></div>
+          </div>
+          <ul id="fileList" class="file-list">
+            <li>请先选择基础文件夹</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col">
+        <div class="selected-items-container">
+          <div class="selected-items-header">已选择的文件/文件夹:</div>
+          <div id="selectedItemsList" class="selected-items">
+            <div>未选择任何项目</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="statusMessage" class="status hidden"></div>
+  </div>
+  
+  <script>
+    const { ipcRenderer } = require('electron');
+    const path = require('path');
+    const fs = require('fs');
+    
+    // 元素引用
+    const selectBaseDirBtn = document.getElementById('selectBaseDirBtn');
+    const clearSelectionsBtn = document.getElementById('clearSelectionsBtn');
+    const generateMdBtn = document.getElementById('generateMdBtn');
+    const baseDirDisplay = document.getElementById('baseDirDisplay');
+    const basePathText = document.getElementById('basePathText');
+    const fileList = document.getElementById('fileList');
+    const selectedItemsList = document.getElementById('selectedItemsList');
+    const statusMessage = document.getElementById('statusMessage');
+    const breadcrumb = document.getElementById('breadcrumb');
+    const breadcrumbPath = document.getElementById('breadcrumbPath');
+    const backBtn = document.getElementById('backBtn');
+    
+    // 状态变量
+    let basePath = null;
+    let currentPath = null;
+    const selectedItems = new Set();
+    let pathHistory = [];
+    
+    // 选择基础文件夹
+    selectBaseDirBtn.addEventListener('click', async () => {
+      const selectedDir = await ipcRenderer.invoke('select-base-dir');
+      if (selectedDir) {
+        basePath = selectedDir;
+        currentPath = selectedDir;
+        pathHistory = [selectedDir];
+        
+        // 清除已选择的所有项目
+        selectedItems.clear();
+        updateSelectedItemsList();
+        updateGenerateButtonState();
+        
+        basePathText.textContent = basePath;
+        baseDirDisplay.classList.remove('hidden');
+        
+        await loadDirectoryContents(currentPath);
+        updateBreadcrumb();
+      }
+    });
+    
+    // 清除所有选择的按钮
+    clearSelectionsBtn.addEventListener('click', () => {
+      if (selectedItems.size > 0) {
+        selectedItems.clear();
+        updateSelectedItemsList();
+        updateGenerateButtonState();
+        
+        // 更新文件列表中的选择状态
+        const currentFileItems = fileList.querySelectorAll('.file-item');
+        currentFileItems.forEach(fileItem => {
+          fileItem.classList.remove('selected');
+        });
+        
+        showStatus(true, '已清除所有选择');
+      }
+    });
+    
+    // 生成MD文件
+    generateMdBtn.addEventListener('click', async () => {
+      try {
+        if (selectedItems.size === 0) {
+          showStatus(false, '请至少选择一个文件或文件夹');
+          return;
+        }
+        
+        // 选择保存MD文件的位置
+        const result = await ipcRenderer.invoke('show-save-dialog', {
+          title: '保存MD文件',
+          buttonLabel: '保存',
+          filters: [{ name: 'Markdown', extensions: ['md'] }],
+          defaultPath: path.join(basePath, 'extracted-files.md')
+        });
+        
+        const { canceled, filePath } = result;
+        if (!canceled && filePath) {
+          // 调用主进程处理
+          const genResult = await ipcRenderer.invoke('generate-md', {
+            basePath: basePath,
+            selectedItems: Array.from(selectedItems),
+            outputFilePath: filePath
+          });
+          
+          // 显示状态信息
+          showStatus(genResult.success, genResult.message);
+        }
+      } catch (error) {
+        showStatus(false, `发生错误: ${error.message}`);
+      }
+    });
+    
+    // 返回上一级目录
+    backBtn.addEventListener('click', async () => {
+      if (pathHistory.length > 1) {
+        pathHistory.pop(); // 移除当前路径
+        currentPath = pathHistory[pathHistory.length - 1];
+        await loadDirectoryContents(currentPath);
+        updateBreadcrumb();
+      }
+    });
+    
+    // 加载目录内容
+    async function loadDirectoryContents(dirPath) {
+      try {
+        const result = await ipcRenderer.invoke('get-directory-contents', dirPath);
+        
+        if (result.success) {
+          // 清空文件列表
+          fileList.innerHTML = '';
+          
+          if (result.items.length === 0) {
+            const emptyItem = document.createElement('li');
+            emptyItem.textContent = '(空文件夹)';
+            fileList.appendChild(emptyItem);
+          } else {
+            // 先显示文件夹，再显示文件
+            const folders = result.items.filter(item => item.isDirectory);
+            const files = result.items.filter(item => !item.isDirectory);
+            
+            [...folders, ...files].forEach(item => {
+              const li = document.createElement('li');
+              li.className = 'file-item';
+              
+              // 检查是否已选择
+              if (selectedItems.has(item.path)) {
+                li.classList.add('selected');
+              }
+              
+              const icon = document.createElement('span');
+              icon.className = item.isDirectory ? 'file-item-icon folder-icon' : 'file-item-icon file-icon';
+              
+              const name = document.createElement('span');
+              name.textContent = item.name;
+              
+              li.appendChild(icon);
+              li.appendChild(name);
+              
+              // 添加点击事件
+              li.addEventListener('click', async (e) => {
+                if (item.isDirectory) {
+                  // 进入子目录
+                  currentPath = item.path;
+                  pathHistory.push(currentPath);
+                  await loadDirectoryContents(currentPath);
+                  updateBreadcrumb();
+                } else {
+                  // 选择或取消选择文件
+                  toggleSelection(item.path);
+                  li.classList.toggle('selected');
+                }
+              });
+              
+              // 添加右键菜单事件
+              li.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                
+                if (item.isDirectory) {
+                  // 为文件夹创建上下文菜单
+                  const menu = document.createElement('div');
+                  menu.className = 'context-menu';
+                  menu.style.position = 'absolute';
+                  menu.style.left = `${e.pageX}px`;
+                  menu.style.top = `${e.pageY}px`;
+                  menu.style.zIndex = 1000;
+                  
+                  const selectItem = document.createElement('div');
+                  selectItem.className = 'context-menu-item';
+                  selectItem.textContent = '选择/取消选择';
+                  selectItem.onclick = () => {
+                    toggleSelection(item.path);
+                    li.classList.toggle('selected');
+                    document.body.removeChild(menu);
+                  };
+                  
+                  const selectEntireFolder = document.createElement('div');
+                  selectEntireFolder.className = 'context-menu-item';
+                  selectEntireFolder.textContent = '选择整个文件夹';
+                  selectEntireFolder.onclick = async () => {
+                    await selectFolder(item.path);
+                    document.body.removeChild(menu);
+                  };
+                  
+                  menu.appendChild(selectItem);
+                  menu.appendChild(selectEntireFolder);
+                  document.body.appendChild(menu);
+                  
+                  // 点击其他地方关闭菜单
+                  document.addEventListener('click', function closeMenu() {
+                    if (document.body.contains(menu)) {
+                      document.body.removeChild(menu);
+                    }
+                    document.removeEventListener('click', closeMenu);
+                  });
+                } else {
+                  // 普通文件仅切换选择状态
+                  toggleSelection(item.path);
+                  li.classList.toggle('selected');
+                }
+              });
+              
+              fileList.appendChild(li);
+            });
+          }
+          
+          // 更新返回按钮状态
+          backBtn.disabled = pathHistory.length <= 1;
+        } else {
+          showStatus(false, result.message);
+        }
+      } catch (error) {
+        showStatus(false, `加载目录内容失败: ${error.message}`);
+      }
+    }
+    
+    // 更新面包屑导航
+    function updateBreadcrumb() {
+      breadcrumbPath.innerHTML = '';
+      
+      if (!basePath || !currentPath) return;
+      
+      let relative = path.relative(basePath, currentPath);
+      let parts = relative === '' ? [] : relative.split(path.sep);
+      let currentParentPath = basePath;
+      
+      // 添加根目录项
+      const rootItem = document.createElement('span');
+      rootItem.className = 'breadcrumb-item';
+      rootItem.textContent = path.basename(basePath);
+      rootItem.addEventListener('click', async () => {
+        currentPath = basePath;
+        pathHistory = [basePath];
+        await loadDirectoryContents(currentPath);
+        updateBreadcrumb();
+      });
+      breadcrumbPath.appendChild(rootItem);
+      
+      // 添加每一级子目录
+      for (let i = 0; i < parts.length; i++) {
+        // 添加分隔符
+        const separator = document.createElement('span');
+        separator.className = 'breadcrumb-separator';
+        separator.textContent = ' / ';
+        breadcrumbPath.appendChild(separator);
+        
+        const part = parts[i];
+        currentParentPath = path.join(currentParentPath, part);
+        
+        const pathItem = document.createElement('span');
+        pathItem.className = 'breadcrumb-item';
+        pathItem.textContent = part;
+        
+        const pathToNavigate = currentParentPath;
+        pathItem.addEventListener('click', async () => {
+          // 找到当前路径在历史中的位置
+          const index = pathHistory.indexOf(pathToNavigate);
+          if (index !== -1) {
+            // 截断历史到该位置
+            pathHistory = pathHistory.slice(0, index + 1);
+          } else {
+            // 如果不在历史中，添加到历史
+            pathHistory.push(pathToNavigate);
+          }
+          
+          currentPath = pathToNavigate;
+          await loadDirectoryContents(currentPath);
+          updateBreadcrumb();
+        });
+        
+        breadcrumbPath.appendChild(pathItem);
+      }
+    }
+    
+    // 切换选择状态
+    function toggleSelection(itemPath) {
+      const isAlreadySelected = selectedItems.has(itemPath);
+      
+      if (isAlreadySelected) {
+        selectedItems.delete(itemPath);
+      } else {
+        selectedItems.add(itemPath);
+      }
+      
+      updateSelectedItemsList();
+      updateGenerateButtonState();
+    }
+    
+    // 更新已选择的项目列表
+    function updateSelectedItemsList() {
+      selectedItemsList.innerHTML = '';
+      
+      if (selectedItems.size === 0) {
+        const emptyMsg = document.createElement('div');
+        emptyMsg.textContent = '未选择任何项目';
+        selectedItemsList.appendChild(emptyMsg);
+        return;
+      }
+      
+      Array.from(selectedItems).forEach(itemPath => {
+        const item = document.createElement('div');
+        item.className = 'selected-item';
+        
+        const itemText = document.createElement('span');
+        // 显示相对于基础目录的路径
+        const relativePath = path.relative(basePath, itemPath);
+        itemText.textContent = relativePath || path.basename(itemPath);
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'remove-btn';
+        removeBtn.textContent = '删除';
+        removeBtn.onclick = () => {
+          selectedItems.delete(itemPath);
+          updateSelectedItemsList();
+          updateGenerateButtonState();
+          
+          // 如果当前在浏览该项所在的目录，更新文件列表中的选择状态
+          const currentFileItems = fileList.querySelectorAll('.file-item');
+          currentFileItems.forEach(fileItem => {
+            const fileName = fileItem.querySelector('span:last-child').textContent;
+            const filePath = path.join(currentPath, fileName);
+            if (filePath === itemPath) {
+              fileItem.classList.remove('selected');
+            }
+          });
+        };
+        
+        item.appendChild(itemText);
+        item.appendChild(removeBtn);
+        selectedItemsList.appendChild(item);
+      });
+    }
+    
+    // 更新生成按钮状态
+    function updateGenerateButtonState() {
+      generateMdBtn.disabled = selectedItems.size === 0;
+    }
+    
+    // 递归选择文件夹及其内容
+    async function selectFolder(folderPath) {
+      try {
+        // 首先选择文件夹本身
+        selectedItems.add(folderPath);
+        
+        // 取得文件夹内容
+        const result = await ipcRenderer.invoke('get-directory-contents', folderPath);
+        
+        if (result.success) {
+          for (const item of result.items) {
+            if (item.isDirectory) {
+              // 递归处理子文件夹
+              await selectFolder(item.path);
+            } else {
+              // 选择文件
+              selectedItems.add(item.path);
+            }
+          }
+        }
+        
+        // 更新选择显示
+        updateSelectedItemsList();
+        updateGenerateButtonState();
+        
+        // 如果当前正在浏览文件夹，更新文件项的选中状态
+        if (currentPath === folderPath) {
+          const currentFileItems = fileList.querySelectorAll('.file-item');
+          currentFileItems.forEach(fileItem => {
+            const fileName = fileItem.querySelector('span:last-child').textContent;
+            const filePath = path.join(currentPath, fileName);
+            if (selectedItems.has(filePath)) {
+              fileItem.classList.add('selected');
+            }
+          });
+        }
+        
+        return true;
+      } catch (error) {
+        showStatus(false, `选择文件夹失败: ${error.message}`);
+        return false;
+      }
+    }
+    
+    // 显示状态信息
+    function showStatus(success, message) {
+      statusMessage.textContent = message;
+      statusMessage.className = success ? 'status success' : 'status error';
+      statusMessage.classList.remove('hidden');
+      
+      // 5秒后隐藏状态信息
+      setTimeout(() => {
+        statusMessage.classList.add('hidden');
+      }, 5000);
+    }
+  </script>
+</body>
+</html>
