@@ -1,15 +1,14 @@
 {
-  "name": "file-extractor",
-  "version": "1.0.0",
-  "description": "一个提取文件内容到Markdown的工具",
-  "main": "file-extractor.js",
+  "name": "file-extractor-web",
+  "version": "1.0.1",
+  "description": "一个提取文件内容到Markdown的网页工具",
+  "main": "index.html",
   "scripts": {
-    "start": "electron ."
+    "start": "npx serve ."
   },
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^28.0.0",
-    "@electron/remote": "^2.0.11"
+    "serve": "^14.2.0"
   }
 }
