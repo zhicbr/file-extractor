@@ -39,6 +39,7 @@ let pathHistory = [];       // 历史记录 (存储相对路径字符串)
 const selectBaseDirBtn = document.getElementById('selectBaseDirBtn');
 const clearSelectionsBtn = document.getElementById('clearSelectionsBtn');
 const generateMdBtn = document.getElementById('generateMdBtn');
+const generateStructBtn = document.getElementById('generateStructBtn');
 const baseDirDisplay = document.getElementById('baseDirDisplay');
 const basePathText = document.getElementById('basePathText');
 const fileList = document.getElementById('fileList');
@@ -116,6 +117,7 @@ generateMdBtn.addEventListener('click', async () => {
     try {
       const saveHandle = await window.showSaveFilePicker({
         suggestedName: 'extracted-files.md',
+        startIn: directoryHandle,
         types: [{
           description: 'Markdown File',
           accept: { 'text/markdown': ['.md'] },
@@ -138,6 +140,121 @@ generateMdBtn.addEventListener('click', async () => {
     console.error(error);
   }
 });
+
+// 生成项目结构
+generateStructBtn.addEventListener('click', async () => {
+  try {
+    if (selectedItems.size === 0) return;
+
+    // 1. 收集路径
+    const paths = await collectStructurePaths(directoryHandle);
+    
+    // 2. 生成树形文本
+    const treeText = generateAsciiTree(paths);
+    const mdContent = '# Project Structure\n\n```text\n' + treeText + '\n```\n';
+
+    // 3. 保存
+    try {
+      const saveHandle = await window.showSaveFilePicker({
+        suggestedName: 'project-structure.md',
+        startIn: directoryHandle,
+        types: [{
+          description: 'Markdown File',
+          accept: { 'text/markdown': ['.md'] },
+        }],
+      });
+      
+      const writable = await saveHandle.createWritable();
+      await writable.write(mdContent);
+      await writable.close();
+      
+      showStatus(true, '项目结构文件已成功生成！');
+    } catch (err) {
+      if (err.name !== 'AbortError') throw err;
+    }
+
+  } catch (error) {
+    showStatus(false, `生成结构失败: ${error.message}`);
+    console.error(error);
+  }
+});
+
+async function collectStructurePaths(rootDirHandle) {
+  const paths = new Set();
+  
+  for (const itemPath of selectedItems) {
+    const relPath = path.relative(basePath, itemPath);
+    
+    if (relPath === '') {
+       // Root selected
+       await collectAllPathsRecursively(rootDirHandle, '', paths);
+    } else {
+       // Find handle
+      const parts = relPath.split('/');
+      let current = rootDirHandle;
+      let targetName = parts.pop();
+      
+      // Traverse to the parent directory of the target
+      for (const part of parts) {
+        current = await current.getDirectoryHandle(part);
+      }
+      
+      try {
+        // Try as file first
+        await current.getFileHandle(targetName);
+        paths.add(relPath);
+      } catch {
+        // Must be directory
+        const dirHandle = await current.getDirectoryHandle(targetName);
+        // Add the directory itself
+        paths.add(relPath);
+        // Add children
+        await collectAllPathsRecursively(dirHandle, relPath, paths);
+      }
+    }
+  }
+  return Array.from(paths);
+}
+
+async function collectAllPathsRecursively(dirHandle, currentRelPath, paths) {
+  for await (const entry of dirHandle.values()) {
+    const entryPath = currentRelPath ? path.join(currentRelPath, entry.name) : entry.name;
+    paths.add(entryPath);
+    
+    if (entry.kind === 'directory') {
+      await collectAllPathsRecursively(entry, entryPath, paths);
+    }
+  }
+}
+
+function generateAsciiTree(paths) {
+  const root = {};
+  for (const p of paths) {
+    const parts = p.split('/');
+    let current = root;
+    for (const part of parts) {
+      if (!current[part]) current[part] = {};
+      current = current[part];
+    }
+  }
+  
+  return (basePath || 'root') + '/\n' + printTree(root, '');
+}
+
+function printTree(node, prefix) {
+  let str = '';
+  const keys = Object.keys(node).sort((a, b) => a.localeCompare(b));
+  
+  keys.forEach((key, index) => {
+    const isLast = index === keys.length - 1;
+    str += prefix + (isLast ? '└── ' : '├── ') + key + '\n';
+    
+    if (Object.keys(node[key]).length > 0) {
+      str += printTree(node[key], prefix + (isLast ? '    ' : '│   '));
+    }
+  });
+  return str;
+}
 
 // 收集所有需要处理的文件 (处理递归和去重)
 async function collectUniqueFiles(rootDirHandle) {
@@ -456,7 +573,9 @@ function updateSelectedItemsList() {
 }
 
 function updateGenerateButtonState() {
-  generateMdBtn.disabled = selectedItems.size === 0;
+  const disabled = selectedItems.size === 0;
+  generateMdBtn.disabled = disabled;
+  generateStructBtn.disabled = disabled;
 }
 
 function updateBackBtnState() {
