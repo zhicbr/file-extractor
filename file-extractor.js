@@ -80,11 +80,14 @@ ipcMain.handle('show-save-dialog', async (event, options) => {
 // 处理生成MD文件的请求
 ipcMain.handle('generate-md', async (event, { basePath, selectedItems, outputFilePath }) => {
   try {
-    let mdContent = '# 文件提取报告\n\n';
+    let mdContent = ''; // 移除“文件提取报告”标题
     
-    // 处理所有选中的项目
-    for (const item of selectedItems) {
-      mdContent = await processItem(item, basePath, mdContent);
+    // 收集所有唯一的文件路径，排除重复
+    const uniqueFilePaths = await collectUniqueFilePaths(selectedItems, basePath);
+    
+    // 处理所有唯一文件
+    for (const filePath of uniqueFilePaths) {
+      mdContent = await processItem(filePath, basePath, mdContent);
     }
     
     // 写入MD文件
@@ -96,16 +99,49 @@ ipcMain.handle('generate-md', async (event, { basePath, selectedItems, outputFil
   }
 });
 
-// 处理单个项目（文件或文件夹）
+// 收集所有唯一的文件路径
+async function collectUniqueFilePaths(selectedItems, basePath) {
+  const uniquePaths = new Set();
+  
+  for (const itemPath of selectedItems) {
+    const stats = fs.statSync(itemPath);
+    
+    if (stats.isFile()) {
+      uniquePaths.add(itemPath);
+    } else if (stats.isDirectory()) {
+      // 递归收集文件夹中的所有文件
+      await collectFilesFromDirectory(itemPath, uniquePaths);
+    }
+  }
+  
+  return Array.from(uniquePaths);
+}
+
+// 递归收集文件夹中的所有文件
+async function collectFilesFromDirectory(dirPath, uniquePaths) {
+  const files = fs.readdirSync(dirPath);
+  
+  for (const file of files) {
+    const filePath = path.join(dirPath, file);
+    const stats = fs.statSync(filePath);
+    
+    if (stats.isFile()) {
+      uniquePaths.add(filePath);
+    } else if (stats.isDirectory()) {
+      await collectFilesFromDirectory(filePath, uniquePaths);
+    }
+  }
+}
+
+// 处理单个项目（现在只处理文件）
 async function processItem(itemPath, basePath, mdContent) {
-  // 检查是否为文件
   const stats = fs.statSync(itemPath);
   
-  // 获取相对路径（不包含基础目录名称）
-  const relativePath = path.relative(basePath, itemPath);
-  
+  // 仅处理文件
   if (stats.isFile()) {
-    // 处理文件
+    // 获取相对路径（不包含基础目录名称）
+    const relativePath = path.relative(basePath, itemPath);
+    
     mdContent += `\n## ${relativePath}\n\n`;
     
     try {
@@ -117,14 +153,6 @@ async function processItem(itemPath, basePath, mdContent) {
       mdContent += '```' + fileExt + '\n' + fileContent + '\n```\n\n';
     } catch (error) {
       mdContent += `无法读取文件内容：${error.message}\n\n`;
-    }
-  } else if (stats.isDirectory()) {
-    // 处理目录
-    const files = fs.readdirSync(itemPath);
-    
-    for (const file of files) {
-      const filePath = path.join(itemPath, file);
-      mdContent = await processItem(filePath, basePath, mdContent);
     }
   }
   
